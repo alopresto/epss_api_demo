@@ -7,15 +7,16 @@ def get_epss_score_for_cve(cve: str) -> str:
     cve_url = EPSSAPI.api_url + f"?cve={cve}"
     print(f"Retrieving EPSS score for {cve}: {cve_url}")
     response = requests.get(cve_url)
-    if response.status_code != 200:
+    if response.status_code != 200 or response.json().get('total') == 0:
         print(f"[Error] Response: {response}")
         pass
     else:
         print(f"Response: {response.json()}")
-        return response.json().get("data")[0].get("epss")
+        probability = response.json().get("data")[0].get("epss")
+        return f"{float(probability) * 100}%"
 
 
-def get_todays_cves_with_scores() -> list:
+def get_todays_cves_with_scores() -> (list, str):
     """Gets latest 100 CVEs known as of today (not CVEs reported today only) in descending order by reporting ID"""
     today = str(date.today())
     cve_url = EPSSAPI.api_url + f"?date={today}"
@@ -26,7 +27,7 @@ def get_todays_cves_with_scores() -> list:
         pass
     else:
         print(f"Response: {response.json()}")
-        return response.json().get("data")
+        return response.json().get("data"), today
 
 
 def get_most_dangerous_cves() -> list:
@@ -52,11 +53,11 @@ def main():
     # Get CVE from command line or empty means get today's CVES
     cve = input("Enter a CVE identifier (CVE-YYYY-XXXXX) or press ENTER to get today's CVEs: ")
     if cve == "":
-        cves = get_todays_cves_with_scores()
-        print(f"Retrieved {len(cves)} CVEs for {str(date.today())}")
+        cves, today = get_todays_cves_with_scores()
+        print(f"Retrieved {len(cves)} CVEs for {today}")
         # TODO: Sort by EPSS score
         for c in cves:
-            print(f"CVE: {c.get('cve')} | EPSS: {c.get('epss')}")
+            print(f"CVE: {c.get('cve'):14} | EPSS: {float(c.get('epss')):5.2%} | Percentile: {float(c.get('percentile')):4.0%}")
     else:
         # Call the API
         epss_score = get_epss_score_for_cve(cve)
